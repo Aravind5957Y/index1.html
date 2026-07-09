@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vehicle Bay Tracker v4</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f8fafc;--muted:#94a3b8;--accent:#3b82f6;--green:#22c55e;--amber:#f59e0b;--blue:#06b6d4;--red:#ef4444;--purple:#a855f7}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+
+.header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:12px}
+.logo-box{width:44px;height:44px;border-radius:10px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.4rem;overflow:hidden}
+.logo-box img{width:100%;height:100%;object-fit:contain}
+.brand h1{font-size:1.4rem;font-weight:800;background:linear-gradient(90deg,var(--accent),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.brand .sub{font-size:.78rem;color:var(--muted)}
+.header-ctrls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat.idle::before{background:var(--green)}
+.stat.work::before{background:var(--amber)}
+.stat.done::before{background:var(--blue)}
+.stat.overdue::before{background:var(--red)}
+.stat.total::before{background:var(--purple)}
+.stat .num{font-size:1.8rem;font-weight:800;margin-bottom:2px}
+.stat.idle .num{color:var(--green)}
+.stat.work .num{color:var(--amber)}
+.stat.done .num{color:var(--blue)}
+.stat.overdue .num{color:var(--red)}
+.stat.total .num{color:var(--purple)}
+.stat .lbl{font-size:.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--border);flex-wrap:wrap}
+.tab{padding:10px 18px;background:0 0;border:0;color:var(--muted);font-size:.88rem;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;border-radius:8px 8px 0 0;white-space:nowrap}
+.tab:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);background:rgba(59,130,246,.08)}
+
+.pane{display:none}
+.pane.on{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.ctrls{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.inp{padding:10px 14px;border-radius:10px;border:2px solid var(--border);background:var(--card);color:var(--text);font-size:.9rem;outline:0;width:260px}
+.inp:focus{border-color:var(--accent)}
+.inp-sm{width:160px}
+.btn{padding:10px 18px;border-radius:10px;border:0;font-size:.85rem;font-weight:600;cursor:pointer;transition:opacity .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{opacity:.9}
+.btn-pri{background:var(--accent);color:#fff}
+.btn-sec{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn-sec:hover{background:var(--border)}
+.btn-red{background:var(--red);color:#fff}
+.btn-grn{background:var(--green);color:#fff}
+
+.bays{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.bay{background:var(--card);border:2px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all .15s;min-height:150px;display:flex;flex-direction:column;position:relative}
+.bay:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.bay.idle{border-color:var(--green);background:linear-gradient(145deg,#1e293b,#0f291e)}
+.bay.work{border-color:var(--amber);background:linear-gradient(145deg,#1e293b,#291e0f)}
+.bay.done{border-color:var(--blue);background:linear-gradient(145deg,#1e293b,#0f1e29)}
+.bay.overdue{border-color:var(--red);animation:pulse 2s infinite;background:linear-gradient(145deg,#1e293b,#290f0f)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 5px rgba(239,68,68,0)}}
+.bay-head{font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;justify-content:space-between}
+.bay-days{font-size:.65rem;color:var(--red);font-weight:700}
+.bay-v{font-size:1rem;font-weight:700;margin-bottom:3px;word-break:break-word;flex:1}
+.bay-v.empty{color:var(--muted);font-weight:500;font-style:italic}
+.bay-cust{font-size:.78rem;color:var(--muted);margin-bottom:2px}
+.bay-phone{font-size:.72rem;color:var(--muted);margin-bottom:3px}
+.bay-tag{display:inline-block;font-size:.65rem;font-weight:700;padding:3px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;align-self:flex-start}
+.tag-idle{background:rgba(34,197,94,.12);color:var(--green)}
+.tag-work{background:rgba(245,158,11,.12);color:var(--amber)}
+.tag-done{background:rgba(6,182,212,.12);color:var(--blue)}
+.tag-overdue{background:rgba(239,68,68,.12);color:var(--red)}
+.bay-mech{font-size:.75rem;color:var(--muted);margin-top:auto}
+.bay-time{font-size:.7rem;color:var(--muted)}
+.bay-note{font-size:.72rem;color:var(--muted);margin-top:3px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;box-orient:vertical}
+.bay-jc{font-size:.7rem;color:var(--muted);margin-bottom:2px}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:100;padding:16px;backdrop-filter:blur(3px)}
+.modal.show{display:flex}
+.modal-box{background:var(--card);border-radius:18px;width:100%;max-width:500px;padding:24px;border:1px solid var(--border);max-height:92vh;overflow-y:auto}
+.modal-box h2{margin:0 0 18px;font-size:1.15rem}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{margin-bottom:12px;position:relative}
+.fg label{display:block;font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em}
+.fg input,.fg select,.fg textarea{width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:.92rem;background:var(--bg);color:var(--text);outline:0;font-family:inherit}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent)}
+.fg textarea{resize:vertical;min-height:60px}
+
+.sts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sts input{display:none}
+.sts label{padding:10px 4px;border:2px solid var(--border);border-radius:10px;text-align:center;font-size:.75rem;font-weight:700;cursor:pointer;transition:all .12s;display:flex;flex-direction:column;align-items:center;gap:3px}
+.sts label:hover{border-color:var(--muted)}
+.sts input:checked+label[for="si"]{border-color:var(--green);background:rgba(34,197,94,.08);color:var(--green)}
+.sts input:checked+label[for="sw"]{border-color:var(--amber);background:rgba(245,158,11,.08);color:var(--amber)}
+.sts input:checked+label[for="sd"]{border-color:var(--blue);background:rgba(6,182,212,.08);color:var(--blue)}
+.sts input:checked+label[for="so"]{border-color:var(--red);background:rgba(239,68,68,.08);color:var(--red)}
+.sts .ico{font-size:1.1rem}
+
+.modal-acts{display:flex;gap:10px;margin-top:18px}
+.modal-acts .btn{flex:1;justify-content:center}
+
+.ac{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;display:none;margin-top:-2px}
+.ac.on{display:block}
+.ac-item{padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid var(--border)}
+.ac-item:hover{background:var(--accent);color:#fff}
+.ac-item:last-child{border-bottom:0}
+
+.cal-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.cal-hd h2{font-size:1.25rem}
+.cal-nav{display:flex;gap:8px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-h{text-align:center;padding:10px;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase}
+.cal-cell{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px;min-height:80px;cursor:pointer;transition:all .15s;position:relative}
+.cal-cell:hover{border-color:var(--accent);transform:scale(1.02)}
+.cal-cell.off{opacity:.35}
+.cal-cell.today{border-color:var(--accent);background:rgba(59,130,246,.06)}
+.cal-cell .n{font-size:.82rem;font-weight:700;margin-bottom:4px}
+.cal-cell .stats{font-size:.65rem;display:flex;flex-direction:column;gap:2px}
+.cal-cell .st{display:flex;align-items:center;gap:3px}
+.cal-cell .dot{width:5px;height:5px;border-radius:50%}
+.cal-cell .badge{position:absolute;top:4px;right:4px;background:var(--red);color:#fff;font-size:.6rem;font-weight:700;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+
+.hist-srch{margin-bottom:16px}
+.hist-list{display:flex;flex-direction:column;gap:10px}
+.hist-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s}
+.hist-item:hover{border-color:var(--accent)}
+.hist-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:6px}
+.hist-name{font-size:1rem;font-weight:700}
+.hist-meta{font-size:.78rem;color:var(--muted)}
+.hist-info{color:var(--muted);font-size:.8rem;margin-bottom:4px}
+.hist-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.hist-chip{background:var(--bg);padding:3px 8px;border-radius:6px;font-size:.72rem;color:var(--muted)}
+
+.reports{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:20px}
+.rep-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+.rep-card h3{font-size:.85rem;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em}
+.chart-wrap{height:180px;display:flex;align-items:center;justify-content:center}
+canvas{max-width:100%}
+
+.exports{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.exp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .15s}
+.exp-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.exp-ico{font-size:1.6rem;margin-bottom:6px}
+.exp-title{font-weight:700;font-size:.88rem;margin-bottom:2px}
+.exp-desc{font-size:.75rem;color:var(--muted)}
+
+.set-sect{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.set-sect h3{font-size:1rem;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.logo-prev{width:70px;height:70px;border-radius:10px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:8px;background:var(--bg);overflow:hidden}
+.logo-prev img{width:100%;height:100%;object-fit:contain}
+.bk-info{font-size:.75rem;color:var(--muted);margin-top:8px}
+.bk-info.ok{color:var(--green)}
+
+.print-only{display:none;background:#fff;color:#1a1a1a;padding:24px}
+.print-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #333}
+.print-logo{display:flex;align-items:center;gap:12px}
+.print-logo-img{width:50px;height:50px;object-fit:contain}
+.print-logo-txt{font-size:2rem}
+.print-co{font-size:1.3rem;font-weight:800;color:#1a1a1a}
+.print-co-sub{font-size:.8rem;color:#555}
+.print-meta{text-align:right;font-size:.82rem;color:#444;line-height:1.6}
+.print-meta b{color:#1a1a1a}
+.print-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.print-sum-box{border:1px solid #ccc;padding:8px;text-align:center;border-radius:6px}
+.print-sum-box .n{font-size:1.4rem;font-weight:800}
+.print-sum-box .l{font-size:.7rem;color:#666;text-transform:uppercase}
+.print-tbl{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:16px}
+.print-tbl th{background:#f0f0f0;padding:6px 8px;border:1px solid #ccc;font-weight:700;text-align:left}
+.print-tbl td{padding:6px 8px;border:1px solid #ccc}
+.print-tbl tr:nth-child(even){background:#fafafa}
+.print-ft{display:flex;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #ccc}
+.print-sig{width:180px}
+.print-sig-line{border-top:1px solid #333;margin-top:30px;padding-top:4px;font-size:.75rem;color:#555}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 18px;font-weight:600;z-index:200;transform:translateY(100px);opacity:0;transition:all .3s;max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+
+.empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty .ico{font-size:2.5rem;margin-bottom:10px;opacity:.5}
+
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+@media(max-width:768px){
+.bays{grid-template-columns:repeat(2,1fr)}
+.cal-grid{grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-cell{min-height:55px;padding:4px}
+.cal-cell .stats{display:none}
+.row{grid-template-columns:1fr}
+.sts{grid-template-columns:repeat(2,1fr)}
+.header{flex-direction:column;align-items:flex-start}
+.inp{width:100%}
+.stats{grid-template-columns:repeat(2,1fr)}
+}
+
+@media print{
+body{background:#fff!important;color:#1a1a1a!important}
+.container,.tabs,.ctrls,.modal,.toast,.stats{display:none!important}
+.pane{display:none!important}
+.print-only{display:block!important}
+@page{size:A4 landscape;margin:12mm}
+}
+</style>
+</head>
+<body>
+
+<div class="container" id="app">
+  <div class="header">
+    <div class="brand">
+      <div class="logo-box" id="logoBox">LOGO</div>
+      <div>
+        <h1 id="coName">Vehicle Bay Tracker</h1>
+        <div class="sub" id="coSub">Workshop Management System</div>
+      </div>
+    </div>
+    <div class="header-ctrls">
+      <input type="date" class="inp inp-sm" id="datePick">
+      <button class="btn btn-sec" onclick="doPrint()">Print</button>
+      <button class="btn btn-sec" onclick="goTab('settings')">Settings</button>
+    </div>
+  </div>
+
+  <div class="stats" id="statsBox"></div>
+
+  <div class="tabs" id="tabBar">
+    <button class="tab on" onclick="goTab('dash')" data-t="dash">Dashboard</button>
+    <button class="tab" onclick="goTab('cal')" data-t="cal">Calendar</button>
+    <button class="tab" onclick="goTab('hist')" data-t="hist">History</button>
+    <button class="tab" onclick="goTab('reports')" data-t="reports">Reports</button>
+    <button class="tab" onclick="goTab('settings')" data-t="settings">Settings</button>
+  </div>
+
+  <div id="pane-dash" class="pane on">
+    <div class="ctrls">
+      <input type="text" class="inp" id="searchInp" placeholder="Search vehicle, customer, job card...">
+      <button class="btn btn-sec" onclick="copyYesterday()">Copy Yesterday</button>
+      <button class="btn btn-red" onclick="resetDay()">Reset</button>
+    </div>
+    <div class="bays" id="bayGrid"></div>
+  </div>
+
+  <div id="pane-cal" class="pane">
+    <div class="cal-hd">
+      <h2 id="calMonth">Month</h2>
+      <div class="cal-nav">
+        <button class="btn btn-sec" onclick="shiftMonth(-1)">Prev</button>
+        <button class="btn btn-sec" onclick="toToday()">Today</button>
+        <button class="btn btn-sec" onclick="shiftMonth(1)">Next</button>
+      </div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <div id="pane-hist" class="pane">
+    <div class="hist-srch">
+      <input type="text" class="inp" id="histInp" placeholder="Search vehicle or customer..." style="width:100%;max-width:400px">
+    </div>
+    <div class="hist-list" id="histList"></div>
+  </div>
+
+  <div id="pane-reports" class="pane">
+    <div class="reports">
+      <div class="rep-card"><h3>Status Distribution</h3><div class="chart-wrap"><canvas id="cPie" width="260" height="180"></canvas></div></div>
+      <div class="rep-card"><h3>Bay Utilization</h3><div class="chart-wrap"><canvas id="cBar" width="260" height="180"></canvas></div></div>
+      <div class="rep-card"><h3>7-Day Trend</h3><div class="chart-wrap"><canvas id="cLine" width="260" height="180"></canvas></div></div>
+    </div>
+    <div style="font-size:.9rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px">Export</div>
+    <div class="exports">
+      <div class="exp-card" onclick="expCSV()"><div class="exp-ico">CSV</div><div class="exp-title">Daily CSV</div><div class="exp-desc">Excel spreadsheet</div></div>
+      <div class="exp-card" onclick="expMonthCSV()"><div class="exp-ico">Month</div><div class="exp-title">Monthly CSV</div><div class="exp-desc">Full month report</div></div>
+      <div class="exp-card" onclick="expJSON()"><div class="exp-ico">Save</div><div class="exp-title">Save Backup</div><div class="exp-desc">JSON file</div></div>
+      <div class="exp-card" onclick="document.getElementById('fileUp').click()"><div class="exp-ico">Load</div><div class="exp-title">Load Backup</div><div class="exp-desc">Restore data</div></div>
+      <div class="exp-card" onclick="expPDF()"><div class="exp-ico">PDF</div><div class="exp-title">PDF Report</div><div class="exp-desc">Print-ready</div></div>
+    </div>
+    <input type="file" id="fileUp" accept=".json" style="display:none" onchange="impJSON(this)">
+  </div>
+
+  <div id="pane-settings" class="pane">
+    <div class="set-sect">
+      <h3>Company Branding</h3>
+      <div class="row">
+        <div class="fg">
+          <label>Logo</label>
+          <div class="logo-prev" id="logoPrev"><span id="logoPlc">LOGO</span><img id="logoImg" style="display:none"></div>
+          <input type="file" id="logoUp" accept="image/*" onchange="upLogo(this)">
+        </div>
+        <div>
+          <div class="fg"><label>Company Name</label><input type="text" id="setCoName" onchange="saveSet()"></div>
+          <div class="fg"><label>Tagline</label><input type="text" id="setCoSub" onchange="saveSet()"></div>
+        </div>
+      </div>
+    </div>
+    <div class="set-sect">
+      <h3>Workshop</h3>
+      <div class="row">
+        <div class="fg"><label>Overdue (days)</label><input type="number" id="setOverdue" min="1" onchange="saveSet()"></div>
+        <div class="fg"><label>Total Bays</label><input type="number" id="setBays" min="1" max="50" onchange="saveSet()"></div>
+      </div>
+      <div class="row">
+        <div class="fg"><label>Default Mechanic</label><input type="text" id="setMech" onchange="saveSet()"></div>
+        <div class="fg"><label>Report Prefix</label><input type="text" id="setPrefix" onchange="saveSet()"></div>
+      </div>
+    </div>
+    <div class="set-sect">
+      <h3>Data</h3>
+      <div class="ctrls">
+        <button class="btn btn-grn" onclick="expJSON()">Save Backup</button>
+        <button class="btn btn-sec" onclick="document.getElementById('fileUp').click()">Load Backup</button>
+        <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+      </div>
+      <div class="bk-info" id="bkInfo"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <h2>Edit <span id="modTitle"></span></h2>
+    <div class="row">
+      <div class="fg" style="position:relative">
+        <label>Vehicle</label>
+        <input type="text" id="mVeh" placeholder="Toyota Camry" autocomplete="off">
+        <div class="ac" id="acList"></div>
+      </div>
+      <div class="fg"><label>Job Card</label><input type="text" id="mJC" placeholder="JC-001"></div>
+    </div>
+    <div class="row">
+      <div class="fg"><label>Customer</label><input type="text" id="mCust" placeholder="John Smith"></div>
+      <div class="fg"><label>Phone</label><input type="tel" id="mPhone" placeholder="+1 234 567 890"></div>
+    </div>
+    <div class="row">
+      <div class="fg"><label>In Time</label><input type="time" id="mIn"></div>
+      <div class="fg"><label>Out Time</label><input type="time" id="mOut"></div>
+    </div>
+    <div class="row">
+      <div class="fg"><label>Mechanic</label><input type="text" id="mMech" placeholder="Mechanic name"></div>
+      <div class="fg"><label>In Date</label><input type="date" id="mInDate"></div>
+    </div>
+    <div class="fg">
+      <label>Status</label>
+      <div class="sts">
+        <input type="radio" name="mSt" id="si" value="idle"><label for="si"><span class="ico">IDLE</span>Idle</label>
+        <input type="radio" name="mSt" id="sw" value="work"><label for="sw"><span class="ico">WORK</span>Work</label>
+        <input type="radio" name="mSt" id="sd" value="done"><label for="sd"><span class="ico">DONE</span>Done</label>
+        <input type="radio" name="mSt" id="so" value="overdue"><label for="so"><span class="ico">OVER</span>Overdue</label>
+      </div>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="mNote" placeholder="Work description..."></textarea></div>
+    <div class="modal-acts">
+      <button class="btn btn-pri" onclick="saveBay()">Save</button>
+      <button class="btn btn-sec" onclick="closeMod()">Cancel</button>
+      <button class="btn btn-red" onclick="clearBay()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<div class="print-only" id="printRep">
+  <div class="print-hd">
+    <div class="print-logo">
+      <img id="pLogoImg" style="display:none" class="print-logo-img">
+      <span id="pLogoTxt" class="print-logo-txt">LOGO</span>
+      <div>
+        <div class="print-co" id="pCoName">Company</div>
+        <div class="print-co-sub" id="pCoSub">Workshop Report</div>
+      </div>
+    </div>
+    <div class="print-meta">
+      <div><b>Report:</b> <span id="pRepNum"></span></div>
+      <div><b>Date:</b> <span id="pDate"></span></div>
+      <div><b>Time:</b> <span id="pTime"></span></div>
+    </div>
+  </div>
+  <div class="print-sum" id="pSum"></div>
+  <table class="print-tbl">
+    <thead><tr><th>Bay</th><th>Job Card</th><th>Vehicle</th><th>Customer</th><th>Phone</th><th>Status</th><th>Days</th><th>Mechanic</th><th>In</th><th>Out</th><th>Notes</th></tr></thead>
+    <tbody id="pBody"></tbody>
+  </table>
+  <div class="print-ft">
+    <div class="print-sig"><div class="print-sig-line">Prepared By</div></div>
+    <div class="print-sig"><div class="print-sig-line">Approved By</div></div>
+    <div class="print-sig"><div class="print-sig-line">Customer Sign</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = 'vbt_v4';
+const BAK = 'vbt_v4_bak';
+const DEF = {
+  coName: 'Vehicle Bay Tracker',
+  coSub: 'Workshop Management System',
+  logo: '',
+  overdueDays: 3,
+  bays: 20,
+  defMech: '',
+  prefix: 'RPT-'
+};
+
+let S = {
+  date: fmtDate(new Date()),
+  cal: new Date(),
+  data: {},
+  reg: {},
+  set: Object.assign({}, DEF),
+  repNum: 1
+};
+let editId = null;
+
+function fmtDate(d) {
+  return d.toISOString().split('T')[0];
+}
+function $(id) {
+  return document.getElementById(id);
+}
+function el(tag, cls, html) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html) e.innerHTML = html;
+  return e;
+}
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() {
+    t.classList.remove('show');
+  }, 2500);
+}
+function daysBetween(a, b) {
+  if (!a || !b) return 0;
+  const x = new Date(a),
+    y = new Date(b);
+  return Math.max(0, Math.floor((y - x) / 86400000));
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      S.data = p.data || {};
+      S.reg = p.reg || {};
+      S.set = Object.assign({}, DEF, p.set || {});
+      S.repNum = p.repNum || 1;
+    }
+  } catch (e) {
+    console.log('load error', e);
+  }
+}
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({
+      data: S.data,
+      reg: S.reg,
+      set: S.set,
+      repNum: S.repNum
+    }));
+  } catch (e) {}
+}
+function autoSave() {
+  try {
+    localStorage.setItem(BAK, JSON.stringify({
+      data: S.data,
+      reg: S.reg,
+      set: S.set,
+      repNum: S.repNum,
+      ts: new Date().toISOString()
+    }));
+  } catch (e) {}
+  const i = $('bkInfo');
+  if (i) {
+    i.textContent = 'Auto-saved ' + new Date().toLocaleTimeString();
+    i.className = 'bk-info ok';
+  }
+}
+function getDay(d) {
+  if (!S.data[d]) {
+    S.data[d] = {};
+    for (let i = 1; i <= S.set.bays; i++) {
+      S.data[d][i] = blankBay();
+    }
+  }
+  return S.data[d];
+}
+function blankBay() {
+  return {
+    vehicle: '',
+    jc: '',
+    cust: '',
+    phone: '',
+    inTime: '',
+    outTime: '',
+    mech: '',
+    inDate: '',
+    note: '',
+    status: 'idle',
+    upd: ''
+  };
+}
+
+function init() {
+  load();
+  $('datePick').value = S.date;
+  $('datePick').addEventListener('change', function(e) {
+    S.date = e.target.value;
+    renderAll();
+  });
+  $('searchInp').addEventListener('input', renderDash);
+  $('histInp').addEventListener('input', renderHist);
+  $('mVeh').addEventListener('input', doAC);
+  $('mVeh').addEventListener('focus', doAC);
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.fg')) $('acList').classList.remove('on');
+  });
+  $('modal').addEventListener('click', function(e) {
+    if (e.target.id === 'modal') closeMod();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeMod();
+  });
+  applySet();
+  renderAll();
+  autoSave();
+  setInterval(autoSave, 300000);
+}
+
+function applySet() {
+  $('coName').textContent = S.set.coName;
+  $('coSub').textContent = S.set.coSub;
+  $('setCoName').value = S.set.coName;
+  $('setCoSub').value = S.set.coSub;
+  $('setOverdue').value = S.set.overdueDays;
+  $('setBays').value = S.set.bays;
+  $('setMech').value = S.set.defMech || '';
+  $('setPrefix').value = S.set.prefix;
+  if (S.set.logo) {
+    $('logoBox').innerHTML = '<img src="' + S.set.logo + '">';
+    $('logoImg').src = S.set.logo;
+    $('logoImg').style.display = 'block';
+    $('logoPlc').style.display = 'none';
+  }
+}
+function saveSet() {
+  S.set.coName = $('setCoName').value || DEF.coName;
+  S.set.coSub = $('setCoSub').value || DEF.coSub;
+  S.set.overdueDays = parseInt($('setOverdue').value) || 3;
+  S.set.bays = Math.min(50, Math.max(1, parseInt($('setBays').value) || 20));
+  S.set.defMech = $('setMech').value;
+  S.set.prefix = $('setPrefix').value || DEF.prefix;
+  save();
+  applySet();
+  toast('Settings saved');
+}
+function upLogo(inp) {
+  const f = inp.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = function(e) {
+    S.set.logo = e.target.result;
+    save();
+    applySet();
+    toast('Logo uploaded');
+  };
+  r.readAsDataURL(f);
+}
+function clearAll() {
+  if (!confirm('Delete ALL data forever?')) return;
+  S.data = {};
+  S.reg = {};
+  S.repNum = 1;
+  save();
+  renderAll();
+  toast('All data cleared');
+}
+
+function renderAll() {
+  renderStats();
+  renderDash();
+  renderCal();
+  renderHist();
+  renderCharts();
+}
+
+function renderStats() {
+  const d = getDay(S.date);
+  let idle = 0,
+    work = 0,
+    done = 0,
+    over = 0,
+    tot = 0;
+  for (let i = 1; i <= S.set.bays; i++) {
+    const b = d[i] || blankBay();
+    if (b.vehicle) tot++;
+    if (b.status === 'idle') idle++;
+    else if (b.status === 'work') work++;
+    else if (b.status === 'done') done++;
+    else if (b.status === 'overdue') over++;
+  }
+  const box = $('statsBox');
+  box.innerHTML = '';
+  const mk = function(cls, n, l) {
+    const s = el('div', 'stat ' + cls);
+    s.innerHTML = '<div class="num">' + n + '</div><div class="lbl">' + l + '</div>';
+    box.appendChild(s);
+  };
+  mk('idle', idle, 'Idle');
+  mk('work', work, 'Working');
+  mk('done', done, 'Complete');
+  mk('overdue', over, 'Overdue');
+  mk('total', tot, 'Total');
+}
+
+function renderDash() {
+  const g = $('bayGrid'),
+    term = ($('searchInp').value || '').toLowerCase(),
+    d = getDay(S.date);
+  g.innerHTML = '';
+  for (let i = 1; i <= S.set.bays; i++) {
+    const b = d[i] || blankBay();
+    if (term && !b.vehicle.toLowerCase().includes(term) && !b.cust.toLowerCase().includes(term) && !b.jc.toLowerCase().includes(term) && !String(i).includes(term)) continue;
+    const days = b.inDate ? daysBetween(b.inDate, S.date) : 0;
+    const isOver = b.vehicle && b.status !== 'done' && days > S.set.overdueDays;
+    const st = isOver ? 'overdue' : (b.status || 'idle');
+    const c = el('div', 'bay ' + st);
+    c.onclick = function() {
+      openMod(i);
+    };
+    const v = b.vehicle || '<span class="empty">Empty Bay</span>';
+    const daysHtml = (b.vehicle && b.status !== 'done' && days > 0) ? '<span class="bay-days">' + days + 'd</span>' : '';
+    c.innerHTML = '<div class="bay-head">Bay #' + String(i).padStart(2, '0') + daysHtml + '</div>' +
+      (b.jc ? '<div class="bay-jc">JC: ' + b.jc + '</div>' : '') +
+      '<div class="bay-v">' + v + '</div>' +
+      (b.cust ? '<div class="bay-cust">' + b.cust + '</div>' : '') +
+      (b.phone ? '<div class="bay-phone">' + b.phone + '</div>' : '') +
+      '<span class="bay-tag tag-' + st + '">' + st + '</span>' +
+      (b.mech ? '<div class="bay-mech">' + b.mech + '</div>' : '') +
+      (b.inTime || b.outTime ? '<div class="bay-time">' + (b.inTime || '--') + ' to ' + (b.outTime || '--') + '</div>' : '') +
+      (b.note ? '<div class="bay-note">' + b.note.substring(0, 40) + (b.note.length > 40 ? '...' : '') + '</div>' : '');
+    g.appendChild(c);
+  }
+}
+
+function openMod(id) {
+  editId = id;
+  const d = getDay(S.date),
+    b = d[id] || blankBay();
+  $('modTitle').textContent = 'Bay #' + String(id).padStart(2, '0');
+  $('mVeh').value = b.vehicle || '';
+  $('mJC').value = b.jc || '';
+  $('mCust').value = b.cust || '';
+  $('mPhone').value = b.phone || '';
+  $('mIn').value = b.inTime || '';
+  $('mOut').value = b.outTime || '';
+  $('mMech').value = b.mech || S.set.defMech || '';
+  $('mInDate').value = b.inDate || S.date;
+  $('mNote').value = b.note || '';
+  const r = document.querySelector('input[name="mSt"][value="' + (b.status || 'idle') + '"]');
+  if (r) r.checked = true;
+  $('modal').classList.add('show');
+  $('acList').classList.remove('on');
+}
+function closeMod() {
+  $('modal').classList.remove('show');
+  editId = null;
+}
+function saveBay() {
+  if (!editId) return;
+  const d = getDay(S.date);
+  d[editId] = {
+    vehicle: $('mVeh').value.trim(),
+    jc: $('mJC').value.trim(),
+    cust: $('mCust').value.trim(),
+    phone: $('mPhone').value.trim(),
+    inTime: $('mIn').value,
+    outTime: $('mOut').value,
+    mech: $('mMech').value.trim(),
+    inDate: $('mInDate').value,
+    note: $('mNote').value.trim(),
+    status: document.querySelector('input[name="mSt"]:checked') ? document.querySelector('input[name="mSt"]:checked').value : 'idle',
+    upd: new Date().toISOString()
+  };
+  const v = d[editId].vehicle;
+  if (v) {
+    const k = v + (d[editId].cust ? ' (' + d[editId].cust + ')' : '');
+    if (!S.reg[k]) S.reg[k] = {
+      first: S.date,
+      count: 0,
+      hist: [],
+      cust: d[editId].cust,
+      phone: d[editId].phone
+    };
+    S.reg[k].last = S.date;
+    S.reg[k].count++;
+    S.reg[k].hist.push({
+      date: S.date,
+      bay: editId,
+      status: d[editId].status,
+      mech: d[editId].mech,
+      note: d[editId].note,
+      jc: d[editId].jc,
+      cust: d[editId].cust,
+      phone: d[editId].phone
+    });
+  }
+  save();
+  renderAll();
+  closeMod();
+  toast('Saved!');
+}
+function clearBay() {
+  if (!editId) return;
+  getDay(S.date)[editId] = blankBay();
+  save();
+  renderAll();
+  closeMod();
+  toast('Cleared');
+}
+
+function doAC() {
+  const inp = $('mVeh'),
+    list = $('acList'),
+    t = (inp.value || '').toLowerCase();
+  const keys = Object.keys(S.reg).filter(function(k) {
+    return k.toLowerCase().includes(t);
+  }).sort(function(a, b) {
+    return S.reg[b].count - S.reg[a].count;
+  }).slice(0, 6);
+  if (!keys.length || !t) {
+    list.classList.remove('on');
+    return;
+  }
+  list.innerHTML = keys.map(function(k) {
+    return '<div class="ac-item" onclick="pickAC(\'' + k.replace(/'/g, "\\'") + '\')">' + k + ' <span style="opacity:.5">(' + S.reg[k].count + 'x)</span></div>';
+  }).join('');
+  list.classList.add('on');
+}
+function pickAC(k) {
+  $('mVeh').value = k;
+  $('acList').classList.remove('on');
+  const r = S.reg[k];
+  if (!r) return;
+  if (r.cust) $('mCust').value = r.cust;
+  if (r.phone) $('mPhone').value = r.phone;
+  if (r.hist && r.hist.length) {
+    const l = r.hist[r.hist.length - 1];
+    if (l.mech) $('mMech').value = l.mech;
+  }
+}
+
+function renderCal() {
+  const y = S.cal.getFullYear(),
+    m = S.cal.getMonth();
+  $('calMonth').textContent = S.cal.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long'
+  });
+  const g = $('calGrid');
+  g.innerHTML = '';
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(function(d) {
+    const h = el('div', 'cal-h');
+    h.textContent = d;
+    g.appendChild(h);
+  });
+  const fd = new Date(y, m, 1).getDay(),
+    dim = new Date(y, m + 1, 0).getDate(),
+    today = fmtDate(new Date());
+  const pd = new Date(y, m, 0).getDate();
+  for (let i = fd - 1; i >= 0; i--) {
+    const c = el('div', 'cal-cell off');
+    c.innerHTML = '<div class="n">' + (pd - i) + '</div>';
+    g.appendChild(c);
+  }
+  for (let d = 1; d <= dim; d++) {
+    const ds = String(y) + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const day = S.data[ds];
+    let w = 0,
+      ok = 0,
+      od = 0;
+    if (day) {
+      Object.values(day).forEach(function(b) {
+        if (b.status === 'work') w++;
+        else if (b.status === 'done') ok++;
+        else if (b.status === 'overdue') od++;
+      });
+    }
+    const c = el('div', 'cal-cell' + (ds === today ? ' today' : ''));
+    c.onclick = function() {
+      S.date = ds;
+      $('datePick').value = ds;
+      goTab('dash');
+    };
+    let s = '';
+    if (w) s += '<div class="st"><span class="dot" style="background:var(--amber)"></span>' + w + ' work</div>';
+    if (ok) s += '<div class="st"><span class="dot" style="background:var(--blue)"></span>' + ok + ' done</div>';
+    if (od) s += '<div class="st"><span class="dot" style="background:var(--red)"></span>' + od + ' overdue</div>';
+    c.innerHTML = '<div class="n">' + d + '</div><div class="stats">' + s + '</div>' + (od ? '<div class="badge">' + od + '</div>' : '');
+    g.appendChild(c);
+  }
+  const rem = (7 - ((fd + dim) % 7)) % 7;
+  for (let i = 1; i <= rem; i++) {
+    const c = el('div', 'cal-cell off');
+    c.innerHTML = '<div class="n">' + i + '</div>';
+    g.appendChild(c);
+  }
+}
+function shiftMonth(n) {
+  S.cal.setMonth(S.cal.getMonth() + n);
+  renderCal();
+}
+function toToday() {
+  S.cal = new Date();
+  renderCal();
+}
+
+function renderHist() {
+  const t = ($('histInp').value || '').toLowerCase(),
+    box = $('histList');
+  box.innerHTML = '';
+  const items = Object.entries(S.reg).filter(function(entry) {
+    const k = entry[0],
+      v = entry[1];
+    return !t || k.toLowerCase().includes(t) || (v.cust && v.cust.toLowerCase().includes(t));
+  }).sort(function(a, b) {
+    return new Date(b[1].last) - new Date(a[1].last);
+  });
+  if (!items.length) {
+    box.innerHTML = '<div class="empty"><div class="ico">?</div><div>No history yet. Track vehicles in Dashboard.</div></div>';
+    return;
+  }
+  items.forEach(function(entry) {
+    const k = entry[0],
+      v = entry[1];
+    const l = v.hist[v.hist.length - 1];
+    const item = el('div', 'hist-item');
+    item.innerHTML = '<div class="hist-hd"><div class="hist-name">' + k + '</div><div class="hist-meta">' + v.count + ' visits</div></div>' +
+      '<div class="hist-info">' + (v.cust || 'N/A') + (v.phone ? ' | ' + v.phone : '') + '</div>' +
+      '<div class="hist-info">Last: ' + v.last + ' | Bay #' + String(l.bay).padStart(2, '0') + ' | ' + l.status + (l.jc ? ' | ' + l.jc : '') + '</div>' +
+      '<div class="hist-chips">' + v.hist.slice(-5).map(function(h) {
+        return '<span class="hist-chip">' + h.date + ' | #' + String(h.bay).padStart(2, '0') + ' | ' + h.status + '</span>';
+      }).join('') + '</div>';
+    box.appendChild(item);
+  });
+}
+
+function renderCharts() {
+  const d = getDay(S.date),
+    c = {
+      idle: 0,
+      work: 0,
+      done: 0,
+      overdue: 0
+    },
+    bt = {};
+  for (let i = 1; i <= S.set.bays; i++) {
+    const b = d[i] || blankBay();
+    c[b.status]++;
+    bt[i] = 0;
+  }
+  Object.values(S.data).forEach(function(day) {
+    for (let i = 1; i <= S.set.bays; i++) {
+      if (day[i] && day[i].vehicle) bt[i]++;
+    }
+  });
+  pie('cPie', [{
+    l: 'Idle',
+    v: c.idle,
+    c: '#22c55e'
+  }, {
+    l: 'Work',
+    v: c.work,
+    c: '#f59e0b'
+  }, {
+    l: 'Done',
+    v: c.done,
+    c: '#06b6d4'
+  }, {
+    l: 'Overdue',
+    v: c.overdue,
+    c: '#ef4444'
+  }]);
+  bar('cBar', bt);
+  line('cLine');
+}
+function pie(id, dat) {
+  const c = $(id),
+    x = c.getContext('2d'),
+    w = c.width,
+    h = c.height;
+  x.clearRect(0, 0, w, h);
+  const tot = dat.reduce(function(s, d) {
+    return s + d.v;
+  }, 0);
+  if (!tot) {
+    x.fillStyle = '#475569';
+    x.textAlign = 'center';
+    x.font = '13px sans-serif';
+    x.fillText('No data', w / 2, h / 2);
+    return;
+  }
+  let a = -Math.PI / 2;
+  const cx = w / 2 - 55,
+    cy = h / 2,
+    r = 60;
+  dat.forEach(function(d) {
+    const s = (d.v / tot) * 2 * Math.PI;
+    x.beginPath();
+    x.moveTo(cx, cy);
+    x.arc(cx, cy, r, a, a + s);
+    x.closePath();
+    x.fillStyle = d.c;
+    x.fill();
+    x.strokeStyle = '#1e293b';
+    x.lineWidth = 2;
+    x.stroke();
+    a += s;
+  });
+  let ly = 22;
+  dat.forEach(function(d) {
+    if (d.v) {
+      x.fillStyle = d.c;
+      x.fillRect(w - 95, ly, 10, 10);
+      x.fillStyle = '#94a3b8';
+      x.font = '11px sans-serif';
+      x.textAlign = 'left';
+      x.fillText(d.l + ': ' + d.v, w - 82, ly + 9);
+      ly += 18;
+    }
+  });
+}
+function bar(id, dat) {
+  const c = $(id),
+    x = c.getContext('2d'),
+    w = c.width,
+    h = c.height;
+  x.clearRect(0, 0, w, h);
+  const v = Object.values(dat),
+    mx = Math.max.apply(null, v.concat([1])),
+    bw = (w - 30) / S.set.bays,
+    ch = h - 35;
+  Object.entries(dat).forEach(function(entry, i) {
+    if (i >= S.set.bays) return;
+    const b = entry[0],
+      n = entry[1];
+    const bh = (n / mx) * ch,
+      xx = 15 + i * bw,
+      yy = h - 25 - bh;
+    x.fillStyle = n > 0 ? '#3b82f6' : '#475569';
+    x.fillRect(xx + 1, yy, bw - 2, bh);
+    x.fillStyle = '#94a3b8';
+    x.font = '9px sans-serif';
+    x.textAlign = 'center';
+    x.fillText(b, xx + bw / 2, h - 8);
+  });
+}
+function line(id) {
+  const c = $('cLine'),
+    x = c.getContext('2d'),
+    w = c.width,
+    h = c.height;
+  x.clearRect(0, 0, w, h);
+  const ds = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(S.date);
+    d.setDate(d.getDate() - i);
+    ds.push(fmtDate(d));
+  }
+  const cnt = ds.map(function(d) {
+    const day = S.data[d];
+    if (!day) return 0;
+    return Object.values(day).filter(function(b) {
+      return b && b.vehicle && b.status !== 'idle';
+    }).length;
+  });
+  const mx = Math.max.apply(null, cnt.concat([1])),
+    p = 25,
+    cw = w - p * 2,
+    ch = h - p * 2,
+    st = cw / (ds.length - 1);
+  x.strokeStyle = '#334155';
+  x.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = p + (ch / 4) * i;
+    x.beginPath();
+    x.moveTo(p, y);
+    x.lineTo(w - p, y);
+    x.stroke();
+  }
+  x.strokeStyle = '#3b82f6';
+  x.lineWidth = 3;
+  x.beginPath();
+  cnt.forEach(function(n, i) {
+    const xx = p + i * st,
+      yy = p + ch - (n / mx) * ch;
+    if (i === 0) x.moveTo(xx, yy);
+    else x.lineTo(xx, yy);
+  });
+  x.stroke();
+  cnt.forEach(function(n, i) {
+    const xx = p + i * st,
+      yy = p + ch - (n / mx) * ch;
+    x.fillStyle = '#3b82f6';
+    x.beginPath();
+    x.arc(xx, yy, 4, 0, Math.PI * 2);
+    x.fill();
+    x.fillStyle = '#fff';
+    x.beginPath();
+    x.arc(xx, yy, 1.5, 0, Math.PI * 2);
+    x.fill();
+  });
+  x.fillStyle = '#94a3b8';
+  x.font = '10px sans-serif';
+  x.textAlign = 'center';
+  ds.forEach(function(d, i) {
+    x.fillText(new Date(d).getDate(), p + i * st, h - 6);
+  });
+}
+
+function expCSV() {
+  const d = getDay(S.date);
+  let csv = 'Bay,Job Card,Vehicle,Customer,Phone,Status,Days,Mechanic,In Date,In Time,Out Time,Notes\r\n';
+  for (let i = 1; i <= S.set.bays; i++) {
+    const b = d[i] || blankBay();
+    const days = b.inDate ? daysBetween(b.inDate, S.date) : 0;
+    csv += i + ',"' + b.jc + '","' + b.vehicle + '","' + b.cust + '","' + b.phone + '",' + b.status + ',' + days + ',"' + b.mech + '","' + b.inDate + '","' + b.inTime + '","' + b.outTime + '","' + b.note + '"\r\n';
+  }
+  dl(csv, 'report_' + S.date + '.csv', 'text/csv');
+  toast('CSV exported');
+}
+function expMonthCSV() {
+  const y = S.cal.getFullYear(),
+    m = String(S.cal.getMonth() + 1).padStart(2, '0');
+  let csv = 'Date,Bay,Job Card,Vehicle,Customer,Phone,Status,Mechanic,In Date,In Time,Out Time,Notes\r\n';
+  Object.entries(S.data).forEach(function(entry) {
+    const date = entry[0],
+      day = entry[1];
+    if (!date.startsWith(y + '-' + m)) return;
+    for (let i = 1; i <= S.set.bays; i++) {
+      const b = day[i];
+      if (b && b.vehicle) {
+        csv += date + ',' + i + ',"' + b.jc + '","' + b.vehicle + '","' + b.cust + '","' + b.phone + '",' + b.status + ',"' + b.mech + '","' + b.inDate + '","' + b.inTime + '","' + b.outTime + '","' + b.note + '"\r\n';
+      }
+    }
+  });
+  if (csv.split('\r\n').length <= 2) {
+    toast('No data for month');
+    return;
+  }
+  dl(csv, 'monthly_' + y + '-' + m + '.csv', 'text/csv');
+  toast('Monthly exported');
+}
+function expJSON() {
+  dl(JSON.stringify({
+    data: S.data,
+    reg: S.reg,
+    set: S.set,
+    repNum: S.repNum
+  }, null, 2), 'backup_' + S.date + '.json', 'application/json');
+  toast('Backup saved');
+}
+function impJSON(inp) {
+  const f = inp.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = function(e) {
+    try {
+      const p = JSON.parse(e.target.result);
+      if (p.data) {
+        S.data = p.data;
+        S.reg = p.reg || {};
+        S.set = Object.assign({}, DEF, p.set || {});
+        S.repNum = p.repNum || 1;
+        save();
+        applySet();
+        renderAll();
+        toast('Restored!');
+      } else {
+        toast('Invalid file');
+      }
+    } catch (err) {
+      toast('Error reading file');
+    }
+  };
+  r.readAsText(f);
+  inp.value = '';
+}
+function dl(content, name, type) {
+  const b = new Blob([content], {
+      type: type
+    }),
+    a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = name;
+  a.click();
+}
+
+function doPrint() {
+  const d = getDay(S.date),
+    num = S.set.prefix + String(S.repNum).padStart(4, '0');
+  S.repNum++;
+  save();
+  $('pRepNum').textContent = num;
+  $('pDate').textContent = new Date(S.date).toLocaleDateString();
+  $('pTime').textContent = new Date().toLocaleTimeString();
+  $('pCoName').textContent = S.set.coName;
+  $('pCoSub').textContent = S.set.coSub;
+  if (S.set.logo) {
+    $('pLogoImg').src = S.set.logo;
+    $('pLogoImg').style.display = 'inline';
+    $('pLogoTxt').style.display = 'none';
+  } else {
+    $('pLogoImg').style.display = 'none';
+    $('pLogoTxt').style.display = 'inline';
+  }
+  let idle = 0,
+    work = 0,
+    done = 0,
+    over = 0,
+    tot = 0;
+  const tb = $('pBody');
+  tb.innerHTML = '';
+  for (let i = 1; i <= S.set.bays; i++) {
+    const b = d[i] || blankBay();
+    if (!b.vehicle) continue;
+    tot++;
+    if (b.status === 'idle') idle++;
+    else if (b.status === 'work') work++;
+    else if (b.status === 'done') done++;
+    else if (b.status === 'overdue') over++;
+    const days = b.inDate ? daysBetween(b.inDate, S.date) : 0;
+    const r = el('tr');
+    r.innerHTML = '<td>#' + String(i).padStart(2, '0') + '</td><td>' + (b.jc || '-') + '</td><td>' + b.vehicle + '</td><td>' + (b.cust || '-') + '</td><td>' + (b.phone || '-') + '</td><td>' + b.status.toUpperCase() + '</td><td>' + days + '</td><td>' + (b.mech || '-') + '</td><td>' + (b.inTime || '-') + '</td><td>' + (b.outTime || '-') + '</td><td>' + (b.note || '-') + '</td>';
+    tb.appendChild(r);
+  }
+  if (!tot) tb.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999">No vehicles for this day</td></tr>';
+  $('pSum').innerHTML = '<div class="print-sum-box"><div class="n" style="color:#22c55e">' + idle + '</div><div class="l">Idle</div></div><div class="print-sum-box"><div class="n" style="color:#f59e0b">' + work + '</div><div class="l">Working</div></div><div class="print-sum-box"><div class="n" style="color:#06b6d4">' + done + '</div><div class="l">Complete</div></div><div class="print-sum-box"><div class="n" style="color:#ef4444">' + over + '</div><div class="l">Overdue</div></div>';
+  window.print();
+}
+function expPDF() {
+  doPrint();
+}
+
+function goTab(t) {
+  document.querySelectorAll('.pane').forEach(function(p) {
+    p.classList.remove('on');
+  });
+  document.querySelectorAll('.tab').forEach(function(b) {
+    b.classList.remove('on');
+  });
+  $('pane-' + t).classList.add('on');
+  const btn = document.querySelector('[data-t="' + t + '"]');
+  if (btn) btn.classList.add('on');
+  if (t === 'reports') renderCharts();
+  if (t === 'settings') applySet();
+}
+function copyYesterday() {
+  const y = new Date(S.date);
+  y.setDate(y.getDate() - 1);
+  const ys = fmtDate(y);
+  if (S.data[ys]) {
+    S.data[S.date] = JSON.parse(JSON.stringify(S.data[ys]));
+    save();
+    renderAll();
+    toast('Copied from yesterday');
+  } else {
+    toast('No yesterday data');
+  }
+}
+function resetDay() {
+  if (!confirm('Reset all bays for this day?')) return;
+  S.data[S.date] = {};
+  for (let i = 1; i <= S.set.bays; i++) {
+    S.data[S.date][i] = blankBay();
+  }
+  save();
+  renderAll();
+  toast('Day reset');
+}
+
+init();
+</script>
+</body>
+</html>
